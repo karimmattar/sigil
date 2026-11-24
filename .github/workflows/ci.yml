@@ -1,0 +1,97 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test (${{ matrix.os }}, py${{ matrix.python }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python: ["3.11", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Install SoftHSM2 (software PKCS#11 token for integration tests)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            sudo apt-get update && sudo apt-get install -y softhsm2
+          else
+            brew install softhsm
+          fi
+
+      - name: Install
+        run: python -m pip install -e ".[dev,tray]"
+
+      - name: Lint
+        run: |
+          ruff check src tests
+          ruff format --check src tests
+
+      - name: Type-check
+        run: mypy
+
+      - name: Tests (unit + SoftHSM integration where available)
+        run: pytest --cov --cov-report=term --cov-report=xml
+
+  build:
+    name: Build (${{ matrix.os }})
+    needs: test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # ubuntu-22.04: older glibc so the binary also runs on older distributions.
+        os: [ubuntu-22.04, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Build (Windows)
+        if: runner.os == 'Windows'
+        run: powershell -ExecutionPolicy Bypass -File packaging\build.ps1
+
+      - name: Build (macOS / Linux)
+        if: runner.os != 'Windows'
+        run: bash packaging/build.sh
+
+      - name: Smoke-test the binary
+        shell: bash
+        run: |
+          case "$RUNNER_OS" in
+            Windows) BIN="dist/sigil.exe" ;;
+            macOS)   BIN="dist/Sigil.app/Contents/MacOS/sigil" ;;
+            *)       BIN="dist/sigil" ;;
+          esac
+          "$BIN" version
+          "$BIN" diagnose --json || test $? -eq 3   # 3 = no token driver on CI (expected)
+
+      - name: Archive macOS app
+        if: runner.os == 'macOS'
+        run: ditto -c -k --keepParent "dist/Sigil.app" "dist/Sigil-macos-arm64.zip"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sigil-${{ runner.os }}
+          path: |
+            dist/sigil.exe
+            dist/sigil
+            dist/Sigil-macos-arm64.zip
+          if-no-files-found: error
