@@ -24,7 +24,7 @@ dependencies = [
     "pydantic>=2.7",
     "pyHanko[pkcs11]>=0.38",
     "pyhanko-certvalidator>=0.33",
-    "asn1crypto>=1.5",
+    "asn1crypto>=1.5.1",
 ]
 
 [project.optional-dependencies]
