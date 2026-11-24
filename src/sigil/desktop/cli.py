@@ -22,7 +22,7 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
-from sigil import SERVICE_NAME, __version__
+from sigil import SERVICE_NAME, __codename__, __version__, display_version
 from sigil.container import build_container
 from sigil.domain.errors import AgentError
 from sigil.infrastructure import paths
@@ -95,7 +95,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 def _run_without_settings(command: str, args: argparse.Namespace) -> int | None:
     """Commands that must work even when the configuration is broken."""
     if command == "version":
-        _out(f"{SERVICE_NAME} {__version__}")
+        _out(f"{SERVICE_NAME} {display_version()}")
         return 0
     if command == "config" and args.action in ("init", "path"):
         return _config_file_command(args.action, args.config, force=args.force)
@@ -154,7 +154,7 @@ def _autostart(action: str) -> int:
 
 def _serve(settings: AgentSettings, *, use_tray: bool) -> int:
     log_dir = configure_logging(settings.log_level, settings.log_dir or paths.log_dir())
-    logger.info("Sigil %s starting on %s", __version__, settings.base_url)
+    logger.info("Sigil %s starting on %s", display_version(), settings.base_url)
     if not settings.is_loopback_only:
         logger.warning(
             "Listening on %s — the agent is reachable from other machines. "
@@ -191,6 +191,7 @@ def _diagnose(settings: AgentSettings, config_file: Path | None, *, as_json: boo
     report: dict[str, Any] = {
         "agent": {
             "version": __version__,
+            "codename": __codename__,
             "python": f"{platform.python_version()} ({struct.calcsize('P') * 8}-bit)",
             "executable": sys.executable,
             "frozen": bool(getattr(sys, "frozen", False)),
@@ -248,7 +249,7 @@ def _token_report(container: Any) -> list[dict[str, Any]] | dict[str, str]:
 def _render_report(report: dict[str, Any]) -> str:
     agent, os_info, driver = report["agent"], report["os"], report["driver"]
     lines = [
-        f"Sigil {agent['version']}  —  Python {agent['python']}",
+        f'Sigil {agent["version"]} "{agent["codename"]}"  —  Python {agent["python"]}',
         f"OS:            {os_info['system']} {os_info['release']} ({os_info['machine']})",
         f"Config file:   {report['config_file']['path']}"
         + ("" if report["config_file"]["exists"] else "  (not created; defaults in use)"),

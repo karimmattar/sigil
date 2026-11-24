@@ -1,14 +1,13 @@
 # Changelog
 
+Versions follow [Semantic Versioning](https://semver.org); every minor version also gets a
+fruit codename (see [docs/RELEASING.md](docs/RELEASING.md)).
+
 ## Unreleased
 
-### Fixed
-- Token driver catalog rebuilt from research of vendor packages and documentation:
-  HyperPKI HYP2003 (`eps2003csp11v2.dll`, `libcastle_v2.*`) is tried first, WatchData ProxKey
-  paths corrected for all OSes, Thales IDPrime Windows paths added, entries without evidence
-  removed. Every entry is tagged with its evidence.
+## 1.0.0 "Apricot" — 2026-11-24
 
-## 1.0.0 — 2026-11-24
+First release: a complete rewrite of the original single-file signing script.
 
 ### Breaking
 - The API now lives under `/api/v1`; the old `/health`, `/tokens` and `/sign-pdf` routes are gone.
@@ -28,8 +27,14 @@
 - PAdES (default) and `adbe.pkcs7` profiles, SHA-256/384/512, visible stamps, RFC 3161 timestamps.
 - Detached/attached CMS and CAdES-BES signing of arbitrary data (`/api/v1/sign/data`).
 - PIN retry-counter reporting, fail-fast on locked tokens, `TOKEN_BUSY` instead of hangs.
-- Driver auto-detection for Windows/macOS/Linux (Egypt Trust/DeltaTrust ePass2003, SafeNet, IDPrime, WatchData, OpenSC).
+- Driver auto-detection for Windows/macOS/Linux, built from vendor packages and documentation
+  (Feitian HyperPKI HYP2003 / ePass2003, WatchData ProxKey, SafeNet, Thales IDPrime, OpenSC);
+  every catalog entry is tagged with its evidence.
 - Desktop app: tray/menu-bar icon, start at login (Windows/macOS/Linux), single-instance detection, CLI (`serve`, `diagnose`, `autostart`, `config`).
 - TOML configuration + environment overrides, rotating logs, JSON audit log.
 - Origin/Host guards, upload limits, security headers, Private Network Access support, optional TLS.
-- 250 tests (unit + SoftHSM2 end-to-end), strict typing, PyInstaller packaging, GitHub Actions matrix for Windows/macOS/Linux.
+- Tests (unit + SoftHSM2 end-to-end), strict typing, PyInstaller packaging, GitHub Actions on Windows/macOS/Linux.
+- Release pipeline: pushing a `vX.Y.Z` tag publishes a GitHub Release with the Windows, macOS
+  and Linux apps plus SHA-256 checksums.
+- Repository rulesets (protected `main`, immutable release tags), Dependabot, CODEOWNERS,
+  pull-request and issue templates.

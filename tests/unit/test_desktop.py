@@ -13,6 +13,7 @@ from typing import Any
 
 import pytest
 
+from sigil import display_version
 from sigil.application.token_service import TokenService
 from sigil.desktop import autostart as autostart_module
 from sigil.desktop import cli
@@ -329,7 +330,7 @@ def isolated_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 class TestCli:
     def test_version(self, capsys: pytest.CaptureFixture[str]) -> None:
         assert cli.main(["version"]) == 0
-        assert capsys.readouterr().out.startswith("sigil 1.")
+        assert capsys.readouterr().out.strip() == f"sigil {display_version()}"
 
     def test_config_init_path_and_show(
         self, isolated_env: Path, capsys: pytest.CaptureFixture[str]
@@ -366,7 +367,7 @@ class TestCli:
         gateway = FakeGateway(tokens=[token_info("SER1")])
         container = SimpleNamespace(token_service=TokenService(gateway))
         report = {
-            "agent": {"version": "1", "python": "3"},
+            "agent": {"version": "1", "codename": "Apricot", "python": "3"},
             "os": {"system": "Darwin", "release": "25", "machine": "arm64"},
             "config_file": {"path": "/c", "exists": True},
             "log_dir": "/l",

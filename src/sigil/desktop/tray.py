@@ -19,6 +19,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from sigil import display_version
 from sigil.application.token_service import TokenService
 from sigil.domain.errors import AgentError, TokenBusyError
 from sigil.infrastructure.config import AgentSettings
@@ -176,6 +177,7 @@ class TrayApp:
     def build_menu(self) -> Any:
         item, menu = self._pystray.MenuItem, self._pystray.Menu
         return menu(
+            item(f"Sigil {display_version()}", None, enabled=False),
             item(lambda _: self._status, None, enabled=False),
             item(f"Listening on {self._settings.base_url}", None, enabled=False),
             menu.SEPARATOR,

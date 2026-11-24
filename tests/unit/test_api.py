@@ -9,6 +9,7 @@ from typing import Any
 
 import pytest
 
+from sigil import __codename__
 from sigil.api.routes import content_disposition, download_name
 from sigil.api.security import BodySizeLimitMiddleware, host_without_port
 from sigil.domain.errors import PinIncorrectError, TokenBusyError
@@ -43,6 +44,7 @@ class TestHealthAndTokens:
     def test_health_ok(self, harness: Harness) -> None:
         body = harness.client.get("/api/v1/health").json()
         assert body["service"] == "sigil"
+        assert body["codename"] == __codename__
         assert body["status"] == "ok"
         assert body["driver"]["module_path"] == "/fake/libcastle.dylib"
         assert body["features"]["timestamp_available"] is False
