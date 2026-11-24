@@ -19,7 +19,7 @@ classifiers = [
 dependencies = [
     "fastapi>=0.165",
     "starlette>=1.10",  # CORSMiddleware(allow_private_network=...)
-    "uvicorn>=0.30",
+    "uvicorn>=0.54.0",
     "python-multipart>=0.0.9",
     "pydantic>=2.7",
     "pyHanko[pkcs11]>=0.38",
