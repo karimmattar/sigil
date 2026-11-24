@@ -413,7 +413,19 @@ class TestCli:
         monkeypatch.setattr(cli.AgentServer, "run", lambda self: calls.append("headless"))
         assert cli.main(["serve", "--no-tray", "--port", "9999"]) == 0
         monkeypatch.setattr(cli, "tray_support", lambda: (True, ""))
-        monkeypatch.setattr(cli.TrayApp, "run", lambda self: calls.append("tray") or 0)
+
+        class FakeTrayApp:
+            """Stands in for TrayApp entirely: the real constructor imports pystray, which
+            fails on headless Linux CI (no X display)."""
+
+            def __init__(self, *args: Any, **kwargs: Any) -> None:
+                pass
+
+            def run(self) -> int:
+                calls.append("tray")
+                return 0
+
+        monkeypatch.setattr(cli, "TrayApp", FakeTrayApp)
         monkeypatch.setattr(cli, "autostart_backend", FakeAutostart)
         assert cli.main([]) == 0  # no command = serve with tray
         monkeypatch.setattr(cli, "tray_support", lambda: (False, "no display"))
