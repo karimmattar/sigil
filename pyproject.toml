@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sigil-agent"
-version = "1.0.0"
+dynamic = ["version"]  # single source: sigil.__version__
 description = "Sigil: local desktop agent bridging a web system and PKCS#11 hard tokens (Egypt Trust / DeltaTrust ePass2003, SafeNet, OpenSC…) for PDF and CMS signing."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -37,6 +37,9 @@ sigil = "sigil.desktop.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.dynamic]
+version = { attr = "sigil.__version__" }
 
 [tool.setuptools.package-data]
 sigil = ["py.typed"]

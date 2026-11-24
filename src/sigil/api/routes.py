@@ -18,7 +18,7 @@ from urllib.parse import quote
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from fastapi.responses import Response
 
-from sigil import SERVICE_NAME, __version__
+from sigil import SERVICE_NAME, __codename__, __version__
 from sigil.application.signing_service import SignDataCommand, SignPdfCommand
 from sigil.container import Container
 from sigil.domain.errors import InvalidRequestError, PayloadTooLargeError
@@ -101,6 +101,7 @@ def health(container: ContainerDep) -> HealthResponse:
     return HealthResponse(
         service=SERVICE_NAME,
         version=__version__,
+        codename=__codename__,
         status="ok" if driver.loaded else "degraded",
         platform=PlatformDTO(
             system=platform.system(),

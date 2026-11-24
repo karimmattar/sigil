@@ -23,6 +23,10 @@ What it can do:
 | Sign a PDF — PAdES (default) or `adbe.pkcs7`, invisible or visible stamp, optional RFC 3161 timestamp, multiple signatures per PDF | `POST /api/v1/sign/pdf` |
 | Sign arbitrary data — detached/attached CMS, CAdES-BES | `POST /api/v1/sign/data` |
 
+**Download:** the latest version for Windows, macOS and Linux is on the
+[Releases page](https://github.com/karimmattar/sigil/releases) (current: **1.0 "Apricot"**;
+every minor version gets a fruit codename).
+
 Full API reference with browser examples: **[docs/API.md](docs/API.md)**.
 Architecture: **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**. Security audit: **[docs/SECURITY.md](docs/SECURITY.md)**.
 
@@ -145,9 +149,12 @@ powershell -ExecutionPolicy Bypass -File packaging\build.ps1   # Windows → dis
 ```
 
 `.github/workflows/ci.yml` runs lint, type-check and tests on Windows/macOS/Linux (Python 3.11 and
-3.13, SoftHSM integration on macOS/Linux) and builds all three binaries as downloadable artifacts.
-The macOS artifact is Apple Silicon; build Intel Macs on an Intel machine. Binaries are not
-code-signed/notarised yet — macOS Gatekeeper and Windows SmartScreen will warn until they are.
+3.13, SoftHSM integration on macOS/Linux) and builds all three apps on every push. Pushing a
+version tag (`v1.0.0`) also publishes them as a GitHub Release — see
+**[docs/RELEASING.md](docs/RELEASING.md)** for the release steps, the fruit codenames and the
+repository rules. The macOS build is Apple Silicon; build Intel Macs on an Intel machine.
+Binaries are not code-signed/notarised yet — macOS Gatekeeper and Windows SmartScreen will warn
+until they are.
 
 ## 7. Troubleshooting
 

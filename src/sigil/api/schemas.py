@@ -81,6 +81,7 @@ class FeaturesDTO(_Out):
 class HealthResponse(_Out):
     service: str
     version: str
+    codename: str
     status: Literal["ok", "degraded"] = Field(
         description="'degraded' when the token driver is not available"
     )

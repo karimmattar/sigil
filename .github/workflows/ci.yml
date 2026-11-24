@@ -66,6 +66,7 @@ jobs:
 
       - name: Build (Windows)
         if: runner.os == 'Windows'
+        shell: pwsh
         run: powershell -ExecutionPolicy Bypass -File packaging\build.ps1
 
       - name: Build (macOS / Linux)
@@ -83,15 +84,81 @@ jobs:
           "$BIN" version
           "$BIN" diagnose --json || test $? -eq 3   # 3 = no token driver on CI (expected)
 
-      - name: Archive macOS app
-        if: runner.os == 'macOS'
-        run: ditto -c -k --keepParent "dist/Sigil.app" "dist/Sigil-macos-arm64.zip"
+      - name: Stage the downloadable file
+        shell: bash
+        run: |
+          mkdir -p release
+          case "$RUNNER_OS" in
+            Windows) cp dist/sigil.exe release/sigil-windows-x64.exe ;;
+            macOS)   ditto -c -k --keepParent "dist/Sigil.app" release/Sigil-macos-arm64.zip ;;
+            *)       tar -C dist -czf release/sigil-linux-x64.tar.gz sigil ;;  # keeps +x
+          esac
+          ls -l release
 
       - uses: actions/upload-artifact@v7
         with:
           name: sigil-${{ runner.os }}
-          path: |
-            dist/sigil.exe
-            dist/sigil
-            dist/Sigil-macos-arm64.zip
+          path: release/*
           if-no-files-found: error
+
+  all-checks:
+    # The single status check required by the main-branch ruleset
+    # (.github/rulesets/main.json), so the matrix can change without editing the rules.
+    name: All checks passed
+    if: always()
+    needs: [test, build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Every test and build job succeeded
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "Job results: $RESULTS"
+          for result in $RESULTS; do
+            if [ "$result" != "success" ]; then
+              echo "::error::A required job did not succeed ($result)."
+              exit 1
+            fi
+          done
+
+  release:
+    name: Publish GitHub Release
+    # Only for version tags such as v1.0.0 (or v1.1.0-rc1 for a pre-release).
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: all-checks
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # create the release and upload its files
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Check the tag matches the app version
+        id: version
+        run: |
+          VERSION=$(sed -n 's/^__version__ = "\(.*\)"/\1/p' src/sigil/__init__.py)
+          CODENAME=$(sed -n 's/^__codename__ = "\(.*\)"/\1/p' src/sigil/__init__.py)
+          if [ "${GITHUB_REF_NAME#v}" != "$VERSION" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match __version__ = $VERSION in src/sigil/__init__.py"
+            exit 1
+          fi
+          echo "codename=$CODENAME" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: sigil-*
+          path: release
+          merge-multiple: true
+
+      - name: Checksums
+        working-directory: release
+        run: sha256sum -- * | tee SHA256SUMS.txt
+
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CODENAME: ${{ steps.version.outputs.codename }}
+        run: |
+          PRERELEASE=""
+          case "$GITHUB_REF_NAME" in *-*) PRERELEASE="--prerelease" ;; esac
+          gh release create "$GITHUB_REF_NAME" release/* \
+            --title "Sigil $GITHUB_REF_NAME — $CODENAME" --generate-notes --verify-tag $PRERELEASE
