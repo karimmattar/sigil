@@ -22,7 +22,7 @@ dependencies = [
     "uvicorn>=0.30",
     "python-multipart>=0.0.9",
     "pydantic>=2.7",
-    "pyHanko[pkcs11]>=0.38",
+    "pyHanko[pkcs11]>=0.38.2",
     "pyhanko-certvalidator>=0.33",
     "asn1crypto>=1.5",
 ]
