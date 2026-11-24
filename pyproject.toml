@@ -20,7 +20,7 @@ dependencies = [
     "fastapi>=0.165",
     "starlette>=1.10",  # CORSMiddleware(allow_private_network=...)
     "uvicorn>=0.30",
-    "python-multipart>=0.0.9",
+    "python-multipart>=0.0.34",
     "pydantic>=2.7",
     "pyHanko[pkcs11]>=0.38",
     "pyhanko-certvalidator>=0.33",
