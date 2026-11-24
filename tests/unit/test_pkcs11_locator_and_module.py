@@ -10,8 +10,11 @@ from typing import Any
 import pytest
 
 from sigil.domain.errors import DriverLoadError, DriverNotFoundError, TokenBusyError
+from sigil.infrastructure.pkcs11 import locator as locator_module
 from sigil.infrastructure.pkcs11.locator import ModuleLocator
 from sigil.infrastructure.pkcs11.module import Pkcs11Module
+
+DRIVER_CATALOG_SOURCE = Path(locator_module.__file__)
 
 
 class FakeFs:
@@ -44,7 +47,7 @@ class TestModuleLocator:
         fs = FakeFs(
             {sys32 + r"\eps2003csp11.dll", sys32 + r"\eps2003csp11v3.dll"},
             globs={
-                (sys32, "eps2003*.dll"): [
+                (sys32, "eps2003csp11*.dll"): [
                     sys32 + r"\eps2003csp11.dll",
                     sys32 + r"\eps2003csp11v3.dll",
                 ]
@@ -80,6 +83,63 @@ class TestModuleLocator:
         fs = FakeFs({path}, globs={("/usr/local/lib", "libcastle*.dylib"): [path]})
         assert ModuleLocator(system="Darwin", fs=fs).candidates() == [path]
         assert ModuleLocator(system="Plan9", fs=fs).candidates() == []
+
+    def test_program_files_placeholders_follow_the_environment(self) -> None:
+        env = {
+            "ProgramFiles": r"E:\Apps",
+            "ProgramFiles(x86)": r"E:\Apps32",
+            "SystemRoot": r"E:\Win",
+        }
+        searched = ModuleLocator(system="Windows", env=env, fs=FakeFs()).searched_locations()
+        assert r"E:\Apps\SafeNet\Authentication\SAC\x64\IDPrimePKCS1164.dll" in searched
+        assert r"E:\Apps32\Gemalto\IDGo 800 PKCS#11\IDPrimePKCS1164.dll" in searched
+        assert not any("{" in p for p in searched)
+
+
+class TestDriverCatalog:
+    """Guards the researched catalog in locator.DRIVER_CATALOG."""
+
+    @pytest.mark.parametrize(
+        ("system", "first"),
+        [
+            ("Windows", r"C:\Windows\System32\eps2003csp11v2.dll"),  # HyperPKI HYP2003
+            ("Darwin", "/usr/local/lib/libcastle_v2.1.0.0.dylib"),  # HyperPKI HYP2003
+            ("Linux", "/usr/local/lib/libcastle.so.1.0.0"),  # ePass2003 vendor location
+        ],
+    )
+    def test_feitian_driver_is_tried_first(self, system: str, first: str) -> None:
+        assert ModuleLocator(system=system, env={}, fs=FakeFs()).searched_locations()[0] == first
+
+    @pytest.mark.parametrize("system", ["Windows", "Darwin", "Linux"])
+    def test_no_duplicates_and_opensc_last(self, system: str) -> None:
+        searched = ModuleLocator(system=system, env={}, fs=FakeFs()).searched_locations()
+        assert len(searched) == len(set(searched))
+        assert "opensc" in searched[-1].lower()
+
+    def test_every_entry_is_backed_by_evidence(self) -> None:
+        """Each path needs an evidence tag inline or in the comment block heading its group."""
+        source = DRIVER_CATALOG_SOURCE.read_text(encoding="utf-8")
+        start, end = source.index("DRIVER_CATALOG:"), source.index("_WINDOWS_DEFAULTS")
+        lines = [line.strip() for line in source[start:end].splitlines()]
+        tags = ("[verified", "[documented", "[convention")
+
+        def is_entry(line: str) -> bool:
+            return line.startswith(('"', "_SYS32 +")) and "," in line
+
+        untagged = []
+        for i, line in enumerate(lines):
+            if not is_entry(line) or any(tag in line for tag in tags):
+                continue
+            j = i - 1
+            while j >= 0 and is_entry(lines[j]):  # siblings of the same group
+                j -= 1
+            heading = []
+            while j >= 0 and lines[j].startswith("#"):  # the group's comment block
+                heading.append(lines[j])
+                j -= 1
+            if not any(tag in text for text in heading for tag in tags):
+                untagged.append(line)
+        assert untagged == []
 
 
 class FakeLib:

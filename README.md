@@ -30,18 +30,34 @@ Architecture: **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**. Security audit: 
 
 ## 1. Install the token driver
 
-The agent uses the driver that ships with your token; install it first (vendor installer).
+Sigil uses the driver (PKCS#11 module) that comes with your token, so install the token
+provider's driver first. Which token you have depends on the provider:
 
-| OS | Egypt Trust / DeltaTrust (Feitian ePass2003) driver the agent looks for |
+| Provider (Egypt) | Token family |
 |---|---|
-| Windows | `C:\Windows\System32\eps2003csp11.dll` (or `eps2003csp11v2.dll`, `SignatureP11.dll`, …) |
-| macOS | `/usr/local/lib/libcastle_v2.1.0.0.dylib` |
-| Linux | `/usr/lib/libcastle.so.1.0.0` |
+| Egypt Trust | Feitian HyperPKI HYP2003 / ePass2003, or WatchData ProxKey |
+| Fixed Misr | Feitian ePass2003 Auto |
+| MCDR | Feitian ePass2003 |
+| El-Delta Trust | not published — run `sigil diagnose`, or set `pkcs11_module` |
 
-SafeNet eToken, Thales IDPrime, WatchData, Hypersecu and OpenSC are auto-detected too
-(full list: `src/sigil/infrastructure/pkcs11/locator.py`). Any other driver works by
-setting `pkcs11_module` in the config. **The driver and the agent must have the same
-architecture** (64-bit; Intel vs Apple Silicon on macOS).
+Where Sigil looks (first match that loads wins; vendor drivers before OpenSC):
+
+| Token | Windows (`C:\Windows\System32\…`) | macOS | Linux |
+|---|---|---|---|
+| HyperPKI HYP2003 | `eps2003csp11v2.dll` | `/usr/local/lib/libcastle_v2.1.0.0.dylib` | `libcastle_v2.so.1.0.0` in `/usr/local/lib` or `/usr/lib` ¹ |
+| ePass2003 | `eps2003csp11.dll` | `/usr/local/lib/libcastle.1.0.0.dylib` | `/usr/local/lib/libcastle.so.1.0.0` ¹ |
+| WatchData ProxKey | `SignatureP11.dll` | `/usr/local/lib/wdProxKeyUsbKeyTool/libwdpkcs_Proxkey.dylib` | `/usr/lib/WatchData/ProxKey/lib/libwdpkcs_SignatureP11.so` |
+| SafeNet eToken | `eTPKCS11.dll` | `/usr/local/lib/libeTPkcs11.dylib` | `/usr/lib/libeTPkcs11.so` |
+| Thales IDPrime | `C:\Program Files\SafeNet\Authentication\SAC\x64\IDPrimePKCS1164.dll` | — | — |
+| OpenSC (generic) | `C:\Program Files\OpenSC Project\OpenSC\pkcs11\opensc-pkcs11.dll` | `/Library/OpenSC/lib/opensc-pkcs11.so` | `/usr/lib/<arch>-linux-gnu/opensc-pkcs11.so` |
+
+¹ The Feitian Linux drivers have no installer — copy the `.so` from the provider's zip to
+`/usr/local/lib`. OpenSC does **not** support HyperPKI HYP2003 tokens; use the vendor driver.
+
+The full list, with the evidence behind every entry, is in
+`src/sigil/infrastructure/pkcs11/locator.py`. Any other driver works by setting
+`pkcs11_module` in the config. **The driver and Sigil must have the same architecture**
+(64-bit; Intel vs Apple Silicon on macOS).
 
 ## 2. Run the agent
 

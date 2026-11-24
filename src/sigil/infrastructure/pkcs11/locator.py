@@ -4,10 +4,20 @@ The catalog is data, not code: supporting another token vendor or OS means addin
 entry to :data:`DRIVER_CATALOG` (Open/Closed principle). Vendor drivers are listed
 before the generic OpenSC module so the vendor's own driver wins when both exist.
 
-Windows paths may contain ``{SystemRoot}`` / ``{ProgramFiles}`` placeholders that are
-expanded from the environment. A 32-bit Python on 64-bit Windows transparently gets
-``SysWOW64`` when it opens ``System32`` (WOW64 redirection), so bitness is handled by
-the OS — the Python and the driver just have to match, which the loader reports.
+Windows paths may contain ``{SystemRoot}``, ``{ProgramFiles}`` and ``{ProgramFilesX86}``
+placeholders that are expanded from the environment. A 32-bit Python on 64-bit Windows
+transparently gets ``SysWOW64`` when it opens ``System32`` (WOW64 redirection), so bitness
+is handled by the OS — the Python and the driver just have to match, which the loader
+reports.
+
+Every entry carries an evidence tag (research of 2026-11-24):
+
+* ``[verified]``   — seen in the vendor's own package or installed files;
+* ``[documented]`` — stated by vendor/integrator documentation or several independent guides;
+* ``[convention]`` — standard install location of the platform's package manager.
+
+Entries without evidence are deliberately left out; any other module can still be used
+by setting ``pkcs11_module`` (or ``extra_module_paths``) in the configuration.
 """
 
 from __future__ import annotations
@@ -34,61 +44,88 @@ class PlatformDrivers:
 
 _SYS32 = "{SystemRoot}\\System32"
 
+# Egyptian e-signature providers ship these token families (provider download pages):
+#   Egypt Trust  -> Feitian HyperPKI HYP2003 / ePass2003, WatchData ProxKey
+#   Fixed Misr   -> Feitian ePass2003 Auto
+#   MCDR         -> Feitian ePass2003
+#   El-Delta     -> not published (ships its own activation tool)
 DRIVER_CATALOG: Mapping[str, PlatformDrivers] = MappingProxyType(
     {
         "Windows": PlatformDrivers(
             vendor_paths=(
-                _SYS32 + "\\eps2003csp11v2.dll",  # Feitian ePass2003 v2 (Egypt Trust / DeltaTrust)
-                _SYS32 + "\\eps2003csp11.dll",  # Feitian ePass2003 (Egypt Trust / DeltaTrust)
-                _SYS32 + "\\SignatureP11.dll",  # newer Egypt Trust tokens
-                _SYS32 + "\\HYP2003_PKCS11.dll",  # Hypersecu HYP2003
-                _SYS32 + "\\ShuttleCsp11_3003.dll",  # Feitian ePass3003
-                _SYS32 + "\\eTPKCS11.dll",  # SafeNet / Thales eToken
-                _SYS32 + "\\IDPrimePKCS11.dll",  # Thales IDPrime
-                _SYS32 + "\\wdpkcs.dll",  # WatchData
+                # Feitian HyperPKI HYP2003 [documented: NIC guide; HyperPKI_HYP2003_Setup report]
+                _SYS32 + "\\eps2003csp11v2.dll",
+                # Feitian ePass2003 [documented: Xolphin/Adobe guide; Egypt e-invoice signers]
+                _SYS32 + "\\eps2003csp11.dll",
+                # WatchData ProxKey [verified: Egypt Trust WatchData installer; NIC guide]
+                _SYS32 + "\\SignatureP11.dll",
+                # SafeNet / Thales eToken (SafeNet Authentication Client) [documented]
+                _SYS32 + "\\eTPKCS11.dll",
+                # Thales IDPrime via SafeNet Authentication Client 10.8+ [documented: Nexus]
+                "{ProgramFiles}\\SafeNet\\Authentication\\SAC\\x64\\IDPrimePKCS1164.dll",
+                "{ProgramFiles}\\SafeNet\\Authentication\\SAC\\x32\\IDPrimePKCS11.dll",
+                # Thales/Gemalto IDPrime via IDGo 800 [documented: Nexus]
+                "{ProgramFilesX86}\\Gemalto\\IDGo 800 PKCS#11\\IDPrimePKCS1164.dll",
+                "{ProgramFilesX86}\\Gemalto\\IDGo 800 PKCS#11\\IDPrimePKCS11.dll",
+                # Other common tokens [documented: NIC DSC guide]
+                _SYS32 + "\\TRUSTKEYP11_ND_v34.dll",  # TrustKey
+                _SYS32 + "\\CryptoIDA_pkcs11.dll",  # mToken CryptoID
             ),
-            vendor_globs=(
-                (_SYS32, "eps2003*.dll"),
-                (_SYS32, "*castle*.dll"),
-                (_SYS32, "*hyp*pkcs11*.dll"),
-            ),
+            # Feitian has shipped several versioned names (eps2003csp11.dll, ...v2.dll).
+            vendor_globs=((_SYS32, "eps2003csp11*.dll"),),
+            # OpenSC [documented: OpenSC project]; it does not support the HYP2003 token.
             generic_paths=("{ProgramFiles}\\OpenSC Project\\OpenSC\\pkcs11\\opensc-pkcs11.dll",),
         ),
         "Darwin": PlatformDrivers(
             vendor_paths=(
-                # Feitian ePass2003 (Egypt Trust / DeltaTrust)
+                # Feitian HyperPKI HYP2003 [verified: installed by HyperPKI package]
                 "/usr/local/lib/libcastle_v2.1.0.0.dylib",
+                # Feitian ePass2003 [verified: Egypt Trust "ePass2003-Castle-mac" package]
                 "/usr/local/lib/libcastle.1.0.0.dylib",
-                "/usr/local/lib/libeTPkcs11.dylib",  # SafeNet / Thales eToken
+                # WatchData ProxKey [documented: CryptoPlanet guide; ZySign]
+                "/usr/local/lib/wdProxKeyUsbKeyTool/libwdpkcs_Proxkey.dylib",
+                "/usr/local/lib/libwdpkcs.dylib",
+                # SafeNet eToken [documented: DigiCert KB; symlink into eToken.framework]
+                "/usr/local/lib/libeTPkcs11.dylib",
                 "/Library/Frameworks/eToken.framework/Versions/Current/libeToken.dylib",
-                "/usr/local/lib/libIDPrimePKCS11.dylib",  # Thales IDPrime
             ),
             vendor_globs=(("/usr/local/lib", "libcastle*.dylib"),),
             generic_paths=(
-                "/Library/OpenSC/lib/opensc-pkcs11.so",
-                "/opt/homebrew/lib/opensc-pkcs11.so",
-                "/usr/local/lib/opensc-pkcs11.so",
+                "/Library/OpenSC/lib/opensc-pkcs11.so",  # OpenSC installer [documented]
+                "/opt/homebrew/lib/opensc-pkcs11.so",  # Homebrew, Apple silicon [convention]
+                "/usr/local/lib/opensc-pkcs11.so",  # Homebrew, Intel [convention]
             ),
         ),
         "Linux": PlatformDrivers(
             vendor_paths=(
-                "/usr/lib/libcastle.so.1.0.0",  # Feitian ePass2003 (Egypt Trust / DeltaTrust)
+                # Feitian ePass2003: "copy anywhere" library; the vendor's own registration
+                # script uses /usr/local/lib [verified: Egypt Trust "ePass2003-Linux" package]
                 "/usr/local/lib/libcastle.so.1.0.0",
-                "/usr/lib/libeTPkcs11.so",  # SafeNet / Thales eToken
-                "/usr/lib/libIDPrimePKCS11.so",  # Thales IDPrime
+                "/usr/lib/libcastle.so.1.0.0",
+                # WatchData ProxKey [verified: Egypt Trust proxkey .deb/.rpm install script]
+                "/usr/lib/WatchData/ProxKey/lib/libwdpkcs_SignatureP11.so",
+                # SafeNet eToken (SafeNet Authentication Client) [documented]
+                "/usr/lib/libeTPkcs11.so",
+                "/usr/local/lib/libeTPkcs11.so",
             ),
-            vendor_globs=(("/usr/lib", "libcastle*.so*"), ("/usr/local/lib", "libcastle*.so*")),
+            # Feitian HyperPKI HYP2003 ships libcastle_v2.so.1.0.0 [documented] — no installer,
+            # so match any libcastle* placed in the usual library directories.
+            vendor_globs=(("/usr/local/lib", "libcastle*.so*"), ("/usr/lib", "libcastle*.so*")),
             generic_paths=(
-                "/usr/lib/x86_64-linux-gnu/opensc-pkcs11.so",
-                "/usr/lib/aarch64-linux-gnu/opensc-pkcs11.so",
-                "/usr/lib64/opensc-pkcs11.so",
-                "/usr/lib/opensc-pkcs11.so",
+                "/usr/lib/x86_64-linux-gnu/opensc-pkcs11.so",  # Debian/Ubuntu [verified]
+                "/usr/lib/aarch64-linux-gnu/opensc-pkcs11.so",  # Debian/Ubuntu arm64 [verified]
+                "/usr/lib64/opensc-pkcs11.so",  # Fedora/RHEL/openSUSE [convention]
+                "/usr/lib/opensc-pkcs11.so",  # Arch [convention]
             ),
         ),
     }
 )
 
-_WINDOWS_DEFAULTS = {"SystemRoot": "C:\\Windows", "ProgramFiles": "C:\\Program Files"}
+_WINDOWS_DEFAULTS = {
+    "SystemRoot": ("SystemRoot", "C:\\Windows"),
+    "ProgramFiles": ("ProgramFiles", "C:\\Program Files"),
+    "ProgramFilesX86": ("ProgramFiles(x86)", "C:\\Program Files (x86)"),
+}
 
 
 class FileSystem(Protocol):
@@ -167,5 +204,8 @@ class ModuleLocator:
         return [p for p in dict.fromkeys(ordered) if self._fs.is_file(p)]
 
     def _expand(self, template: str) -> str:
-        values = {key: self._env.get(key, default) for key, default in _WINDOWS_DEFAULTS.items()}
+        values = {
+            placeholder: self._env.get(variable, default)
+            for placeholder, (variable, default) in _WINDOWS_DEFAULTS.items()
+        }
         return template.format(**values)

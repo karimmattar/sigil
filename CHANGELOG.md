@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+- Token driver catalog rebuilt from research of vendor packages and documentation:
+  HyperPKI HYP2003 (`eps2003csp11v2.dll`, `libcastle_v2.*`) is tried first, WatchData ProxKey
+  paths corrected for all OSes, Thales IDPrime Windows paths added, entries without evidence
+  removed. Every entry is tagged with its evidence.
+
 ## 1.0.0 — 2026-11-24
 
 ### Breaking
